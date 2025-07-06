@@ -152,14 +152,14 @@ const SignupForm = ({ switchToLogin }) => {
       alert("Cet email est déjà utilisé !");
       return;
     }
+    const newUser = { ...formData, id: Date.now() }; // Ajoute un id unique
+storedUsers.push(newUser);
+localStorage.setItem("users", JSON.stringify(storedUsers));
+localStorage.setItem("user", JSON.stringify(newUser));
+localStorage.setItem("sessionExpiration", Date.now() + SESSION_DURATION);
 
-    storedUsers.push(formData);
-    localStorage.setItem("users", JSON.stringify(storedUsers));
-    localStorage.setItem("user", JSON.stringify(formData));
-    localStorage.setItem("sessionExpiration", Date.now() + SESSION_DURATION);
-
-    setUser(formData);
-    window.location.href = `/${formData.role}/accueil`;
+setUser(newUser);
+window.location.href = `/${newUser.role}/accueil`;
   };
 
   return (
@@ -238,9 +238,16 @@ const SignupForm = ({ switchToLogin }) => {
 
 const AuthPage = () => {
   const [isSignup, setIsSignup] = useState(false);
+  
+
   return (
     <div className="auth-page-container">
       <div className="auth-form-container">
+      <img
+          src="/logo.png"
+          alt="Logo"
+          style={{ width: 120, display: "block", margin: "30px auto 20px" }}
+        />
         <h2 className="text-2xl font-bold mb-4 text-center">
           {isSignup ? "Inscription" : "Connexion"}
         </h2>

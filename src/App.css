@@ -1,4 +1,4 @@
-/* Reset CSS */
+/* Reset CSS */ 
 * {
   margin: 0;
   padding: 0;
@@ -20,42 +20,43 @@ body {
 .auth-page-container {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0; /* Changé de 'right' à 'left' */
   width: 100%;
   height: 100vh;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start; /* Changé de 'flex-end' à 'flex-start' */
   align-items: center;
-  background: linear-gradient(to right, #0097b2, #00b4d8);
+  background-image: url('C:\xampp\htdocs\gestiondip_fe\public\uploads\1239282.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   padding: 20px;
 }
 
 /* Conteneur du formulaire */
 .auth-form-container {
-  width: 400px;
-  margin-right: 80px;
-  padding: 30px;
+  width: 360px; /* Augmenté de 320px à 360px pour plus de largeur */
+  margin-left: 60px;
+  padding: 20px;
   background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
   animation: slideIn 0.5s ease-out;
 }
 
 /* Styles des inputs */
-.auth-form-container input,
-.auth-form-container select {
+.auth-form-container input, .auth-form-container select {
   width: 100%;
-  padding: 12px;
-  padding-left: 40px;
-  margin-bottom: 15px;
+  padding: 10px; /* Réduit de 12px à 10px */
+  padding-left: 35px; /* Réduit de 40px à 35px */
+  margin-bottom: 12px; /* Réduit de 15px à 12px */
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px; /* Réduit de 8px à 6px */
+  font-size: 13px; /* Réduit de 14px à 13px */
   transition: all 0.3s ease;
 }
 
-.auth-form-container input:focus,
-.auth-form-container select:focus {
+.auth-form-container input:focus, .auth-form-container select:focus {
   outline: none;
   border-color: #0097b2;
   box-shadow: 0 0 0 3px rgba(0, 151, 178, 0.1);
@@ -64,12 +65,13 @@ body {
 /* Style des boutons */
 .auth-form-container button[type="submit"] {
   width: 100%;
-  padding: 12px;
+  padding: 10px; /* Réduit de 12px à 10px */
   border: none;
-  border-radius: 8px;
+  border-radius: 6px; /* Réduit de 8px à 6px */
   background-color: #0097b2;
   color: white;
   font-weight: 600;
+  font-size: 13px; /* Ajout d'une taille de police réduite */
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -110,7 +112,7 @@ body {
 /* Animation d'entrée */
 @keyframes slideIn {
   from {
-    transform: translateX(100px);
+    transform: translateX(-100px); /* Changé de translateX(100px) à translateX(-100px) */
     opacity: 0;
   }
   to {
@@ -122,8 +124,9 @@ body {
 /* Style du titre */
 .auth-form-container h2 {
   color: #0097b2;
-  margin-bottom: 24px;
+  margin-bottom: 16px; /* Réduit de 24px à 16px */
   text-align: center;
+  font-size: 18px; /* Ajout d'une taille de police plus petite */
 }
 
 /* Style du select */
@@ -146,10 +149,10 @@ body {
   .auth-page-container {
     padding: 16px;
   }
-
+  
   .auth-form-container {
     width: 100%;
-    margin-right: 0;
+    margin-left: 0; /* Changé de 'margin-right' à 'margin-left' */
     padding: 20px;
   }
 }

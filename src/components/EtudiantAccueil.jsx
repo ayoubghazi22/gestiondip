@@ -2,26 +2,39 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiMoreVertical, FiBell, FiLogOut } from "react-icons/fi";
 import { motion } from "framer-motion";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import "./EtudiantAccueil.css";
+// Correction automatique des anciennes demandes avec "status" au lieu de "statut"
+if (typeof window !== "undefined") {
+  const demandes = JSON.parse(localStorage.getItem("demandes") || "[]");
+  let changed = false;
+  demandes.forEach(d => {
+    if (d.status && !d.statut) {
+      d.statut = d.status;
+      delete d.status;
+      changed = true;
+    }
+  });
+  if (changed) {
+    localStorage.setItem("demandes", JSON.stringify(demandes));
+  }
+}
 
 const EtudiantAccueil = () => {
   const [darkMode, setDarkMode] = useState(localStorage.getItem("darkMode") === "true");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [view, setView] = useState("accueil"); // Changed default view
+  const [view, setView] = useState("accueil");
   const navigate = useNavigate();
   const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [feedbackType, setFeedbackType] = useState("");
-  const [statutDemande, setStatutDemande] = useState(localStorage.getItem("statutDemande") || "non soumis");
+  const [statutDemande, setStatutDemande] = useState("non soumis");
   const [filiere, setFiliere] = useState("");
   const [lieuNaissance, setLieuNaissance] = useState("");
   const [dateNaissance, setDateNaissance] = useState("");
   const [files, setFiles] = useState([]);
   const [moyennes, setMoyennes] = useState([]);
-
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    localStorage.setItem("darkMode", !darkMode);
-  };
+  const [demande, setDemande] = useState(null);
+  const [niveau, setNiveau] = useState("");
 
   useEffect(() => {
     if (darkMode) {
@@ -31,12 +44,77 @@ const EtudiantAccueil = () => {
     }
   }, [darkMode]);
 
+  // Récupère la demande de l'étudiant connecté à chaque navigation ou connexion
   useEffect(() => {
     const user = localStorage.getItem("user");
     if (!user) {
       navigate("/");
+      return;
+    }
+    const demandes = JSON.parse(localStorage.getItem("demandes") || "[]");
+    const userId = JSON.parse(user).id;
+    const demandeTrouvee = demandes.find((d) => d.etudiantId === userId);
+    if (demandeTrouvee) {
+      setDemande(demandeTrouvee);
+      setStatutDemande(demandeTrouvee.statut); // Correction ici
+      setFeedbackMessage(demandeTrouvee.feedback || "");
+    } else {
+      setDemande(null);
+      setStatutDemande("non soumis");
+      setFeedbackMessage("");
     }
   }, [navigate]);
+
+  // Recharge la demande à chaque fois que l'étudiant clique sur "Voir mon statut"
+  useEffect(() => {
+    if (view === "statut") {
+      const user = localStorage.getItem("user");
+      if (!user) return;
+      const demandes = JSON.parse(localStorage.getItem("demandes") || "[]");
+      const userId = JSON.parse(user).id;
+      const demandeTrouvee = demandes.find((d) => d.etudiantId === userId);
+      if (demandeTrouvee) {
+        setDemande(demandeTrouvee);
+        setStatutDemande(demandeTrouvee.statut); // Correction ici
+        setFeedbackMessage(demandeTrouvee.feedback || "");
+      } else {
+        setDemande(null);
+        setStatutDemande("non soumis");
+        setFeedbackMessage("");
+      }
+    }
+  }, [view]);
+  // Dans EtudiantAccueil.js - Ajoutez cet useEffect supplémentaire après les useEffect existants :
+
+// AJOUT : Écouter les changements de localStorage pour mise à jour temps réel
+useEffect(() => {
+  const handleStorageChange = () => {
+    const user = localStorage.getItem("user");
+    if (!user) return;
+    
+    const demandes = JSON.parse(localStorage.getItem("demandes") || "[]");
+    const userId = JSON.parse(user).id;
+    const demandeTrouvee = demandes.find((d) => d.etudiantId === userId);
+    
+    if (demandeTrouvee) {
+      setDemande(demandeTrouvee);
+      setStatutDemande(demandeTrouvee.statut);
+      setFeedbackMessage(demandeTrouvee.feedback || "");
+    } else {
+      setDemande(null);
+      setStatutDemande("non soumis");
+      setFeedbackMessage("");
+    }
+  };
+  
+  window.addEventListener("storage", handleStorageChange);
+  return () => window.removeEventListener("storage", handleStorageChange);
+}, []);
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    localStorage.setItem("darkMode", !darkMode);
+  };
 
   const handleTextChange = (e, setState) => {
     const value = e.target.value;
@@ -47,8 +125,23 @@ const EtudiantAccueil = () => {
 
   const handleFileChange = (e) => {
     const uploadedFiles = Array.from(e.target.files);
+    const requiredCount = niveau === "license" ? 3 : 5;
+    const validTypes = ["application/pdf", "image/jpeg", "image/jpg"];
+
+    if (uploadedFiles.length !== requiredCount) {
+      toast.error(`Vous devez télécharger exactement ${requiredCount} fichiers.`);
+      return;
+    }
+
+    for (let file of uploadedFiles) {
+      if (!validTypes.includes(file.type)) {
+        toast.error("Les fichiers doivent être au format PDF ou JPG.");
+        return;
+      }
+    }
+
     setFiles(uploadedFiles);
-    setMoyennes(new Array(uploadedFiles.length).fill(""));
+    setMoyennes(new Array(requiredCount).fill(""));
   };
 
   const handleMoyenneChange = (index, value) => {
@@ -60,11 +153,14 @@ const EtudiantAccueil = () => {
   };
 
   const isFormValid = () => {
+    const requiredCount = niveau === "license" ? 3 : 5;
     return (
       filiere.trim() !== "" &&
       lieuNaissance.trim() !== "" &&
       dateNaissance.trim() !== "" &&
-      files.length > 0 &&
+      niveau &&
+      files.length === requiredCount &&
+      moyennes.length === requiredCount &&
       moyennes.every((moy) => moy !== "" && moy >= 0 && moy <= 20)
     );
   };
@@ -77,101 +173,103 @@ const EtudiantAccueil = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isFormValid()) {
-      const user = JSON.parse(localStorage.getItem("user"));
-      const demandes = JSON.parse(localStorage.getItem("demandes")) || [];
-      
-      const nouvelleDemande = {
-        id: Date.now(),
-        etudiant: {
-          nom: user.nom,
-          prenom: user.prenom,
-          email: user.email,
+      try {
+        const user = JSON.parse(localStorage.getItem("user"));
+        const nouvelleDemande = {
+          id: Date.now(),
           filiere,
           lieuNaissance,
           dateNaissance,
+          niveau,
           moyennes,
-        },
-        fichiers: files.map((file) => file.name),
-        statut: "En attente",
-      };
-      
-      demandes.push(nouvelleDemande);
-      localStorage.setItem("demandes", JSON.stringify(demandes));
-      setStatutDemande("en attente");
-      localStorage.setItem("statutDemande", "en attente");
-      alert("Votre demande a été soumise avec succès !");
+          files: files.map((f) => f.name),
+          statut: "En attente", // Correction ici
+          type: "etudiant",     // Ajout ici
+          etudiantId: user.id,
+          etudiantNom: `${user.nom} ${user.prenom}`,
+          dateCreation: new Date().toISOString(),
+          feedback: "",
+        };
+
+        // Sauvegarde dans localStorage
+        const demandes = JSON.parse(localStorage.getItem("demandes") || "[]");
+        demandes.push(nouvelleDemande);
+        localStorage.setItem("demandes", JSON.stringify(demandes));
+
+        setDemande(nouvelleDemande);
+        setStatutDemande("En attente");
+        localStorage.setItem("statutDemande", "En attente");
+        toast.success("Demande soumise avec succès");
+        setView("statut");
+
+        // Réinitialiser le formulaire
+        setFiliere("");
+        setLieuNaissance("");
+        setDateNaissance("");
+        setFiles([]);
+        setMoyennes([]);
+        setNiveau("");
+        window.dispatchEvent(new Event("storage")); // Pour la synchro instantanée
+      } catch (error) {
+        toast.error("Erreur lors de la soumission de la demande.");
+      }
     }
   };
 
   return (
     <div className="container">
-      {/* Header avec message de bienvenue */}
+      <ToastContainer position="top-right" autoClose={5000} />
+
+      {/* Header */}
       <div className="welcome-header">
-        <div className="welcome-message">
-          Bienvenue au portail étudiant
-        </div>
+        <div className="welcome-message">Bienvenue au portail étudiant</div>
         <div className="actions">
-  <div className="menu-icon" onClick={() => setMenuOpen(!menuOpen)}>
-    <FiMoreVertical size={24} />
-  </div>
-  {menuOpen && (
-    <div className="dropdown-menu">
-      <button onClick={() => alert("Notifications")}>
-        <FiBell size={18} />
-        Notifications
-      </button>
-      <button onClick={handleLogout}>
-        <FiLogOut size={18} />
-        Déconnexion
-      </button>
-    </div>
-  )}
-</div>
+          <div className="menu-icon" onClick={() => setMenuOpen(!menuOpen)}>
+            <FiMoreVertical size={24} />
+          </div>
+          {menuOpen && (
+            <div className="dropdown-menu">
+              <button onClick={() => alert("Notifications")}>
+                <FiBell size={18} />
+                Notifications
+              </button>
+              <button onClick={handleLogout}>
+                <FiLogOut size={18} />
+                Déconnexion
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Menu latéral */}
       <div className="menu-lateral">
         <h2>Système de Diplômes</h2>
-        <button 
-          className={view === "accueil" ? "active" : ""} 
-          onClick={() => setView("accueil")}
-        >
+        <button className={view === "accueil" ? "active" : ""} onClick={() => setView("accueil")}>
           Accueil
         </button>
-        <button 
-          className={view === "demande" ? "active" : ""} 
-          onClick={() => setView("demande")}
-        >
+        <button className={view === "demande" ? "active" : ""} onClick={() => setView("demande")}>
           Soumettre une demande
         </button>
-        <button 
-          className={view === "statut" ? "active" : ""} 
-          onClick={() => setView("statut")}
-        >
+        <button className={view === "statut" ? "active" : ""} onClick={() => setView("statut")}>
           Voir mon statut
         </button>
       </div>
 
-      {/* Contenu dynamique */}
+      {/* Contenu principal */}
       <div className="contenu">
         <div className="contenu-box">
           {view === "accueil" ? (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <h2>Tableau de bord</h2>
               <p>Bienvenue sur votre espace étudiant</p>
             </motion.div>
           ) : view === "demande" ? (
-            // Existing demande content
             <>
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                 <h2>Soumettre une demande</h2>
               </motion.div>
               <form onSubmit={handleSubmit} className="formulaire">
-                {/* ...existing form content... */}
                 <div className="form-group">
                   <label>Filière :</label>
                   <input type="text" value={filiere} onChange={(e) => handleTextChange(e, setFiliere)} />
@@ -188,55 +286,90 @@ const EtudiantAccueil = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Document PDF :</label>
-                  <input type="file" multiple accept=".pdf" onChange={handleFileChange} />
+                  <label>Niveau d'études :</label>
+                  <select
+                    value={niveau}
+                    onChange={(e) => {
+                      setNiveau(e.target.value);
+                      setFiles([]);
+                      setMoyennes([]);
+                    }}
+                    required
+                  >
+                    <option value="">Sélectionnez un niveau</option>
+                    <option value="license">License</option>
+                    <option value="master">Master</option>
+                  </select>
                 </div>
 
-                {files.length > 0 && (
-                  <div className="form-group">
-                    <h3>Fichiers sélectionnés :</h3>
-                    <ul>
-                      {files.map((file, index) => (
-                        <li key={index}>{file.name}</li>
-                      ))}
-                    </ul>
+                {niveau && (
+                  <>
+                    <div className="form-group">
+                      <label>Documents (PDF ou JPG) - {niveau === "license" ? "3" : "5"} fichiers requis :</label>
+                      <input type="file" multiple accept=".pdf,.jpg,.jpeg" onChange={handleFileChange} required />
+                      {files.length > 0 && (
+                        <div className="files-preview">
+                          {files.map((file, index) => (
+                            <div key={index} className="file-item">
+                              {file.name}
+                              <button
+                                type="button"
+                                className="btn-view"
+                                onClick={() => {
+                                  const fileURL = URL.createObjectURL(file);
+                                  window.open(fileURL, "_blank");
+                                }}
+                              >
+                                Afficher le document
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                    <h3>Moyennes des années :</h3>
-                    {files.map((_, index) => (
-                      <div key={index} className="moyenne-group">
-                        <label>Moyenne {index + 1}ᵉ année :</label>
-                        <input
-                          type="number"
-                          value={moyennes[index] || ""}
-                          onChange={(e) => handleMoyenneChange(index, e.target.value)}
-                          min="0"
-                          max="20"
-                        />
+                    <div className="form-group">
+                      <label>Moyennes annuelles :</label>
+                      <div className="moyennes-grid">
+                        {[...Array(niveau === "license" ? 3 : 5)].map((_, index) => (
+                          <input
+                            key={index}
+                            type="number"
+                            min="0"
+                            max="20"
+                            step="0.01"
+                            placeholder={`Moyenne ${index + 1}`}
+                            value={moyennes[index] || ""}
+                            onChange={(e) => handleMoyenneChange(index, e.target.value)}
+                            required
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  </>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={!isFormValid()}
-                  className={isFormValid() ? "valide" : "desactive"}
-                >
+                <button type="submit" disabled={!isFormValid()} className={isFormValid() ? "valide" : "desactive"}>
                   Soumettre
                 </button>
               </form>
             </>
           ) : (
-            <>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <h2>État de la demande</h2>
-              <p>
-                Statut : {statutDemande === "non soumis" ? (
-                  <span className="statut-non-soumis">Vous n'avez pas encore soumis une demande</span>
-                ) : (
-                  <span className="statut-attente">En attente</span>
-                )}
-              </p>
-            </>
+              {!demande || statutDemande === "non soumis" ? (
+                <p className="statut-non-soumis">Vous n'avez pas encore soumis de demande</p>
+              ) : (
+                <div className="statut-details">
+                  <p className={`statut-${statutDemande}`}>Statut : {statutDemande}</p>
+                  {feedbackMessage && <p className="feedback-message">Retour du jury : {feedbackMessage}</p>}
+                  <div className="demande-details">
+                    <p>Date de soumission : {new Date(demande.dateCreation).toLocaleDateString()}</p>
+                    <p>Filière : {demande.filiere}</p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
           )}
         </div>
       </div>

@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Ignore tout sauf src
+/*
+!/gestiondip_fe/src/
+    

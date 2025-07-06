@@ -17,9 +17,13 @@ const JuryAccueil = () => {
     if (!user) {
       navigate("/");
     }
-    // Charger les demandes depuis le localStorage
-    const storedDemandes = JSON.parse(localStorage.getItem("demandes")) || [];
-    setDemandes(storedDemandes);
+    const update = () => {
+      const storedDemandes = JSON.parse(localStorage.getItem("demandes")) || [];
+      setDemandes(storedDemandes);
+    };
+    update();
+    window.addEventListener("storage", update);
+    return () => window.removeEventListener("storage", update);
   }, [navigate]);
 
   const handleLogout = () => {
@@ -28,29 +32,56 @@ const JuryAccueil = () => {
     toast.success("Déconnexion réussie");
   };
 
-  const handleValiderDemande = (demandeId) => {
-    const updatedDemandes = demandes.map(demande => {
-      if (demande.id === demandeId) {
-        return { ...demande, statut: "Validé" };
-      }
-      return demande;
-    });
-    setDemandes(updatedDemandes);
-    localStorage.setItem("demandes", JSON.stringify(updatedDemandes));
-    toast.success("Demande validée avec succès");
-  };
+  // Dans JuryAccueil.js - Remplacez les fonctions handleValiderDemande et handleRefuserDemande par :
 
-  const handleRefuserDemande = (demandeId) => {
-    const updatedDemandes = demandes.map(demande => {
+const handleValiderDemande = (demandeId) => {
+  const storedDemandes = JSON.parse(localStorage.getItem("demandes")) || [];
+  const updatedDemandes = storedDemandes.map(demande => {
+    if (demande.id === demandeId) {
+      return { ...demande, statut: "Validé", feedback: "Demande validée par le jury" };
+    }
+    return demande;
+  });
+  
+  // Mettre à jour le state ET le localStorage
+  setDemandes(updatedDemandes);
+  localStorage.setItem("demandes", JSON.stringify(updatedDemandes));
+  
+  // Déclencher l'événement storage pour synchroniser les autres interfaces
+  window.dispatchEvent(new Event("storage"));
+  
+  toast.success("Demande validée avec succès");
+};
+
+const handleRefuserDemande = (demandeId) => {
+  const feedback = prompt("Motif du refus :");
+  if (feedback) {
+    const storedDemandes = JSON.parse(localStorage.getItem("demandes")) || [];
+    const updatedDemandes = storedDemandes.map(demande => {
       if (demande.id === demandeId) {
-        return { ...demande, statut: "Refusé" };
+        return { ...demande, statut: "Refusé", feedback };
       }
       return demande;
     });
+    
+    // Mettre à jour le state ET le localStorage
     setDemandes(updatedDemandes);
     localStorage.setItem("demandes", JSON.stringify(updatedDemandes));
+    
+    // Déclencher l'événement storage pour synchroniser les autres interfaces
+    window.dispatchEvent(new Event("storage"));
+    
     toast.error("Demande refusée");
-  };
+  }
+};
+
+  // Helpers pour compatibilité
+  const getNom = (demande) =>
+    demande.enseignant?.nom || "-";
+  const getPrenom = (demande) =>
+    demande.enseignant?.prenom || "-";
+  const getGrade = (demande) =>
+    demande.enseignant?.grade || demande.grade || "-";
 
   return (
     <div className="container">
@@ -111,8 +142,8 @@ const JuryAccueil = () => {
               <h2>Tableau de bord</h2>
               <p>Bienvenue sur votre espace jury</p>
               <div className="statistics">
-                <p>Demandes en attente : {demandes.filter(d => d.statut === "En attente").length}</p>
-                <p>Demandes traitées : {demandes.filter(d => d.statut !== "En attente").length}</p>
+                <p>Demandes de promotion en attente : {demandes.filter(d => d.statut === "En attente" && d.type === "promotion").length}</p>
+                <p>Demandes de promotion traitées : {demandes.filter(d => d.statut !== "En attente" && d.type === "promotion").length}</p>
               </div>
             </motion.div>
           ) : view === "demandes" ? (
@@ -121,26 +152,26 @@ const JuryAccueil = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h2>Demandes en attente</h2>
+              <h2>Demandes de promotion en attente</h2>
               <div className="table-container">
-                {demandes.filter(d => d.statut === "En attente").length > 0 ? (
+                {demandes.filter(d => d.statut === "En attente" && d.type === "promotion").length > 0 ? (
                   <table>
                     <thead>
                       <tr>
                         <th>Nom</th>
                         <th>Prénom</th>
-                        <th>Filière</th>
+                        <th>Grade</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {demandes
-                        .filter(demande => demande.statut === "En attente")
+                        .filter(demande => demande.statut === "En attente" && demande.type === "promotion")
                         .map(demande => (
                           <tr key={demande.id}>
-                            <td>{demande.etudiant.nom}</td>
-                            <td>{demande.etudiant.prenom}</td>
-                            <td>{demande.etudiant.filiere}</td>
+                            <td>{getNom(demande)}</td>
+                            <td>{getPrenom(demande)}</td>
+                            <td>{getGrade(demande)}</td>
                             <td className="actions-cell">
                               <button 
                                 className="valide"
@@ -160,7 +191,7 @@ const JuryAccueil = () => {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="empty-message">Aucune demande en attente</p>
+                  <p className="empty-message">Aucune demande de promotion en attente</p>
                 )}
               </div>
             </motion.div>
@@ -170,27 +201,27 @@ const JuryAccueil = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h2>Historique des demandes</h2>
+              <h2>Historique des promotions</h2>
               <div className="table-container">
-                {demandes.filter(d => d.statut !== "En attente").length > 0 ? (
+                {demandes.filter(d => d.statut !== "En attente" && d.type === "promotion").length > 0 ? (
                   <table>
                     <thead>
                       <tr>
                         <th>Nom</th>
                         <th>Prénom</th>
-                        <th>Filière</th>
+                        <th>Grade</th>
                         <th>Statut</th>
                       </tr>
                     </thead>
                     <tbody>
                       {demandes
-                        .filter(demande => demande.statut !== "En attente")
+                        .filter(demande => demande.statut !== "En attente" && demande.type === "promotion")
                         .map(demande => (
                           <tr key={demande.id}>
-                            <td>{demande.etudiant.nom}</td>
-                            <td>{demande.etudiant.prenom}</td>
-                            <td>{demande.etudiant.filiere}</td>
-                            <td className={`statut-${demande.statut.toLowerCase()}`}>
+                            <td>{getNom(demande)}</td>
+                            <td>{getPrenom(demande)}</td>
+                            <td>{getGrade(demande)}</td>
+                            <td className={`statut-${demande.statut ? demande.statut.toLowerCase() : ""}`}>
                               {demande.statut}
                             </td>
                           </tr>
@@ -198,7 +229,7 @@ const JuryAccueil = () => {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="empty-message">Aucune demande traitée</p>
+                  <p className="empty-message">Aucune promotion traitée</p>
                 )}
               </div>
             </motion.div>
